@@ -10,6 +10,9 @@ unsigned short find_str_in_table(char * s, char * table[]) {
 //return an unsigned short
 //two bytes, in theory represents 65536 possible indices
     for (int i = 0; i < STR_TABLE_SIZE; i++ ) {
+        if (table[i] == NULL) {
+            return -1;
+        }
         if (strcmp(s, table[i]) == 0) {
             return i;
         }
@@ -60,7 +63,7 @@ int lz78_encode(char * input_file_path, char * output_file_path) {
     size_t curr_word_size = 1;
     unsigned short prev_idx = -1;
     while ((file_char = fgetc(input)) != EOF) {
-        printf("current character: %c\n", file_char);
+        //printf("current character: %c\n", file_char);
         char tmp[2];
         tmp[0] = file_char;
         tmp[1] = '\0';
@@ -69,8 +72,11 @@ int lz78_encode(char * input_file_path, char * output_file_path) {
             curr_word = realloc(curr_word, curr_word_size);
             curr_word_buff_size = curr_word_size;
         }
+        //printf("concatenating character to curr word\n");
         size_t cat_length = strlcat(curr_word, tmp, curr_word_buff_size);
+        //printf("done. searching for string in table\n");
         int str_table_search_idx = find_str_in_table(curr_word, string_table);
+        //printf("done: idx is %d\n", str_table_search_idx);
         if (str_table_search_idx != -1) {
             printf("Found match in table for string: %s\n", curr_word);
             //set the prev index into the table for use later if needed
