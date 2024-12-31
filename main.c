@@ -17,16 +17,25 @@ unsigned short find_str_in_table(char * s, char * table[]) {
     return -1;
 }
 
-
-int lz78_encode(char * input_file_path) {
-    char * string_table[STR_TABLE_SIZE];
+int initialize_table(char * table[]) {
     for (int i = 0; i < 256; i++ ) {
-        string_table[i] = malloc(sizeof(char) * 2);
-        if (string_table[i] == NULL) {
+        table[i] = malloc(sizeof(char) * 2);
+        if (table[i] == NULL) {
             return -1;
         }
-        string_table[i][0] = (char) i;
-        string_table[i][1] = '\0';
+        table[i][0] = (char) i;
+        table[i][1] = '\0';
+    }
+    return 0;
+}
+
+
+int lz78_encode(char * input_file_path, char * output_file_path) {
+    char * string_table[STR_TABLE_SIZE];
+    int initialize_result = initialize_table(string_table);
+    if (initialize_result == -1) {
+        printf("Error initializing string table\n");
+        return -1;
     }
     int string_table_idx = 256;
     FILE *input = fopen(input_file_path, "r");
@@ -34,7 +43,7 @@ int lz78_encode(char * input_file_path) {
         perror("Error opening file");
         return 1;
     }
-    FILE *output = fopen("./output.txt", "w");
+    FILE *output = fopen(output_file_path, "w");
     // Check if the file was successfully opened
     if (output == NULL) {
         perror("Error creating file");
@@ -51,6 +60,7 @@ int lz78_encode(char * input_file_path) {
     size_t curr_word_size = 1;
     unsigned short prev_idx = -1;
     while ((file_char = fgetc(input)) != EOF) {
+        printf("current character: %c\n", file_char);
         char tmp[2];
         tmp[0] = file_char;
         tmp[1] = '\0';
@@ -83,22 +93,76 @@ int lz78_encode(char * input_file_path) {
         }
     }
 
-    // Close the file
     fclose(input);
-    return 0;
     fprintf(output, "Hello, World!\n");
     fprintf(output, "This is a test file.\n");
     fclose(output);
-
-
-
     //TODO: free memory
+    return 0;
+}
+
+int lz78_decode(char * input, char* output) {
+    FILE *encoded_file = fopen(input, "r");
+    if (encoded_file == NULL) {
+        perror("Error opening file");
+        return 1;
+    }
+    FILE *decoded_file = fopen(output, "w");
+    char * string_table[STR_TABLE_SIZE];
+    int string_table_idx = 256;
+    initialize_table(string_table);
+
+
+    uint16_t code;  // To store the two-byte value (assuming little-endian or matching byte order)
+    size_t bytesRead;
+
+    size_t curr_word_buff_size = 1;
+    char * curr_word = malloc(sizeof(char)*curr_word_buff_size);
+    curr_word[0] = '\0';
+    size_t curr_word_size = 1;
+    while ((bytesRead = fread(&code, sizeof(code), 1, encoded_file)) == 1) {
+        //first, write the stored value of the code to the output stream
+        fputs(string_table[code], decoded_file);
+        int idx = 0;
+        while (string_table[code][idx] != '\0') {
+            curr_word_size ++;
+            if (curr_word_size > curr_word_buff_size) {
+                curr_word = realloc(curr_word, curr_word_size);
+            }
+            int str_table_search_idx = find_str_in_table(curr_word, string_table);
+            if (str_table_search_idx != -1) {
+                //nothing to do
+            } else {
+                //the entry doesn't exist; update the code for the word, excluding the current
+                //character, and then set the current word equal to the current character
+                curr_word[curr_word_size-2] = '\0';
+                char * copied_word = malloc(sizeof(char)* curr_word_size);
+                size_t copy_len = strlcpy(copied_word, curr_word, curr_word_size);
+                string_table[string_table_idx++] = copied_word;
+                curr_word[0] = string_table[code][idx];
+                curr_word[1] = '\0';
+                curr_word_size = 2;
+            }
+            idx ++;
+        }
+    }
+    if (bytesRead == 0 && feof(encoded_file)) {
+        printf("End of file reached.\n");
+    } else if (bytesRead == 0) {
+        perror("Error reading file");
+    }
+
+
+
+    fclose(encoded_file);
+    fclose(decoded_file);
     return 0;
 }
 
 
 
 int main() {
-    lz78_encode("oh snap");
+    lz78_encode("./input.txt", "./output.txt");
+
 
 }
